@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Google + Tracking Pengunjung</title>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
+</head>
+<body>
+
+<h2>Login Menggunakan Google</h2>
+<button onclick="loginGoogle()">Login Dengan Google</button>
+
+<pre id="output"></pre>
+
+<script>
+    // ---------------------------------------------------------
+    // 1. Firebase Config (ganti dengan punya kamu)
+    // ---------------------------------------------------------
+    const firebaseConfig = {
+        apiKey: "MASUKKAN_API_KEY",
+        authDomain: "MASUKKAN_AUTH_DOMAIN",
+        databaseURL: "MASUKKAN_DB_URL",
+        projectId: "MASUKKAN_PROJECT_ID",
+        storageBucket: "MASUKKAN_BUCKET",
+        messagingSenderId: "MASUKKAN_SENDER",
+        appId: "MASUKKAN_APP_ID"
+    };
+
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+    const provider = new firebase.auth.GoogleAuthProvider();
+
+
+    // ---------------------------------------------------------
+    // 2. Login Dengan Google
+    // ---------------------------------------------------------
+    function loginGoogle() {
+        auth.signInWithPopup(provider)
+            .then(async (result) => {
+                const user = result.user;
+
+                // Info Google
+                const userData = {
+                    google_uid: user.uid,
+                    name: user.displayName,
+                    email: user.email,
+                    photo: user.photoURL,
+                    login_time: new Date().toLocaleString()
+                };
+
+                // Ambil IP & Lokasi
+                const geo = await fetch("https://ipapi.co/json/").then(r => r.json());
+                userData.ip = geo.ip;
+                userData.city = geo.city;
+                userData.region = geo.region;
+                userData.country = geo.country_name;
+                userData.isp = geo.org;
+
+                // Device info
+                userData.browser = navigator.userAgent;
+                userData.platform = navigator.platform;
+
+                // GPS (optional)
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        userData.latitude = pos.coords.latitude;
+                        userData.longitude = pos.coords.longitude;
+
+                        saveToFirebase(userData);
+                    }, () => {
+                        userData.gps = "Menolak izin GPS";
+                        saveToFirebase(userData);
+                    });
+                } else {
+                    userData.gps = "Browser tidak mendukung GPS";
+                    saveToFirebase(userData);
+                }
+            })
+            .catch(error => {
+                console.log("Login Error:", error);
+            });
+    }
+
+
+    // ---------------------------------------------------------
+    // 3. Simpan Ke Firebase
+    // ---------------------------------------------------------
+    function saveToFirebase(data) {
+        db.ref("google_logins").push(data);
+
+        document.getElementById("output").textContent = 
+            JSON.stringify(data, null, 2);
+    }
+
+</script>
+
+</body>
+</html>
